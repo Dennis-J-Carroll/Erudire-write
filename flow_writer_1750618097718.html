@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowWriter</title>
+    <style>
+        :root {
+            /* Light Theme */
+            --bg-primary: #fefefe;
+            --bg-secondary: #f8f9fa;
+            --bg-panel: #f8f9fa;
+            --bg-card: #ffffff;
+            --text-primary: #2c2c2c;
+            --text-secondary: #495057;
+            --text-muted: #6c757d;
+            --border-color: #e9ecef;
+            --accent-primary: #6495ed;
+            --accent-secondary: #ffd700;
+            --shadow: rgba(0,0,0,0.08);
+            --shadow-heavy: rgba(0,0,0,0.15);
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #242424;
+            --bg-panel: #2d2d2d;
+            --bg-card: #333333;
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --text-muted: #888888;
+            --border-color: #404040;
+            --accent-primary: #7ba7ff;
+            --accent-secondary: #ffd700;
+            --shadow: rgba(0,0,0,0.3);
+            --shadow-heavy: rgba(0,0,0,0.5);
+        }
+
+        [data-theme="beige"] {
+            --bg-primary: #f7f5f1;
+            --bg-secondary: #f0ede6;
+            --bg-panel: #ebe7dd;
+            --bg-card: #faf8f4;
+            --text-primary: #3c3528;
+            --text-secondary: #5d5342;
+            --text-muted: #7a6f5c;
+            --border-color: #d4c9b8;
+            --accent-primary: #8b7355;
+            --accent-secondary: #c49b61;
+            --shadow: rgba(60,53,40,0.08);
+            --shadow-heavy: rgba(60,53,40,0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            height: 100vh;
+            transition: all 0.3s ease;
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Theme Switcher */
+        .theme-switcher {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 50;
+            display: flex;
+            gap: 0.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem;
+            box-shadow: 0 2px 10px var(--shadow);
+        }
+
+        .theme-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1rem;
+        }
+
+        .theme-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .theme-btn.light { background: #ffffff; color: #333; }
+        .theme-btn.dark { background: #333333; color: #fff; }
+        .theme-btn.beige { background: #f0ede6; color: #3c3528; }
+        .theme-btn.active { box-shadow: 0 0 0 2px var(--accent-primary); }
+
+        /* File Tree Panel */
+        .file-panel {
+            width: 350px;
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto;
+            z-index: 10;
+            box-shadow: 2px 0 10px var(--shadow);
+        }
+
+        .file-panel.collapsed {
+            width: 0;
+            border-right: none;
+            box-shadow: none;
+        }
+
+        .file-panel-content {
+            padding: 1.5rem;
+            min-width: 350px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        /* Version Branch Indicator */
+        .branch-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            background: var(--bg-card);
+            border-radius: 6px;
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .branch-name {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .new-branch-btn {
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .new-branch-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* File Tree */
+        .file-tree {
+            list-style: none;
+        }
+
+        .tree-item {
+            margin: 0.5rem 0;
+        }
+
+        .tree-node {
+            display: flex;
+            align-items: center;
+            padding: 0.6rem 0.8rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .tree-node:hover {
+            background: rgba(100, 149, 237, 0.1);
+            transform: translateX(3px);
+        }
+
+        .tree-node.active {
+            background: rgba(100, 149, 237, 0.2);
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .tree-node.has-image::after {
+            content: '🖼️';
+            position: absolute;
+            right: 0.5rem;
+            font-size: 0.8rem;
+            opacity: 0.6;
+        }
+
+        .tree-icon {
+            margin-right: 0.8rem;
+            font-size: 1rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .tree-children {
+            margin-left: 1.5rem;
+            border-left: 1px dashed var(--border-color);
+            padding-left: 1rem;
+        }
+
+        /* Smart Tag System */
+        .tag-container {
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .tag-section {
+            margin-bottom: 1rem;
+        }
+
+        .tag-section h5 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .tag-filter {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.8rem;
+        }
+
+        .tag {
+            background: var(--accent-primary);
+            color: white;
+            padding: 0.3rem 0.8rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            position: relative;
+        }
+
+        .tag.auto-detected {
+            background: var(--accent-secondary);
+            color: var(--text-primary);
+        }
+
+        .tag.connected {
+            box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.5);
+        }
+
+        .tag:hover {
+            transform: scale(1.05);
+        }
+
+        .tag.active {
+            background: var(--accent-secondary);
+            color: var(--text-primary);
+            transform: scale(1.05);
+        }
+
+        /* Connection Visualization */
+        .connection-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .connection-line {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent-secondary), transparent);
+            opacity: 0.7;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+        /* Image Preview */
+        .image-preview {
+            margin-top: 1rem;
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+        }
+
+        .image-preview img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+        }
+
+        .image-caption {
+            padding: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Main Writing Area */
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .writing-header {
+            padding: 1rem 2rem;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .app-title {
+            font-size: 1.4rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            opacity: 0.8;
+        }
+
+        .writing-container {
+            flex: 1;
+            padding: 2rem;
+            background: var(--bg-secondary);
+            position: relative;
+        }
+
+        .writing-area {
+            background: var(--bg-card);
+            border-radius: 12px;
+            box-shadow: 0 4px 25px var(--shadow);
+            padding: 3rem;
+            height: 100%;
+            position: relative;
+        }
+
+        .outline-hint {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: var(--bg-panel);
+            padding: 0.8rem 1.2rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            color: var(--accent-primary);
+            opacity: 0;
+            transition: all 0.3s ease;
+            max-width: 350px;
+            border-left: 4px solid var(--accent-primary);
+            box-shadow: 0 2px 10px var(--shadow);
+        }
+
+        .outline-hint.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .outline-source {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+
+        .editor {
+            width: 100%;
+            height: calc(100% - 2rem);
+            border: none;
+            outline: none;
+            font-size: 1.15rem;
+            line-height: 1.8;
+            resize: none;
+            font-family: 'Georgia', serif;
+            background: transparent;
+            color: var(--text-primary);
+        }
+
+        .flow-suggestion {
+            position: absolute;
+            background: var(--bg-panel);
+            border-left: 4px solid var(--accent-secondary);
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            max-width: 420px;
+            z-index: 15;
+            cursor: pointer;
+            box-shadow: 0 4px 15px var(--shadow);
+        }
+
+        .flow-suggestion.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .flow-suggestion:hover {
+            background: var(--bg-card);
+            transform: translateY(-2px);
+        }
+
+        /* Format Panel */
+        .format-panel {
+            width: 280px;
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border-color);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow-y: auto;
+            z-index: 10;
+            box-shadow: -2px 0 10px var(--shadow);
+        }
+
+        .format-panel.collapsed {
+            width: 0;
+            border-left: none;
+            box-shadow: none;
+        }
+
+        .format-panel-content {
+            padding: 1.5rem;
+            min-width: 280px;
+        }
+
+        .format-section {
+            margin-bottom: 2rem;
+        }
+
+        .format-section h4 {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .format-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .format-btn {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            color: var(--text-primary);
+        }
+
+        .format-btn:hover {
+            background: var(--accent-primary);
+            color: white;
+            border-color: var(--accent-primary);
+        }
+
+        .format-btn.active {
+            background: var(--accent-primary);
+            color: white;
+            border-color: var(--accent-primary);
+        }
+
+        /* Panel Toggle Controls */
+        .panel-toggle {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 80px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            transition: all 0.3s ease;
+            box-shadow: 2px 0 10px var(--shadow);
+        }
+
+        .panel-toggle:hover {
+            background: var(--bg-panel);
+            color: var(--accent-primary);
+            transform: translateY(-50%) translateX(3px);
+        }
+
+        .panel-toggle.left {
+            left: 0;
+        }
+
+        .panel-toggle.right {
+            right: 0;
+            border-radius: 8px 0 0 8px;
+            border-right: none;
+            border-left: 1px solid var(--border-color);
+            box-shadow: -2px 0 10px var(--shadow);
+        }
+
+        .panel-toggle.right:hover {
+            transform: translateY(-50%) translateX(-3px);
+        }
+
+        .panel-toggle.collapsed {
+            background: var(--bg-panel);
+            color: var(--accent-primary);
+        }
+
+        /* Status Bar */
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-card);
+            padding: 0.8rem 2rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            z-index: 5;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Branch Modal */
+        .branch-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .branch-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .branch-modal-content {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 2rem;
+            width: 400px;
+            box-shadow: 0 10px 40px var(--shadow-heavy);
+        }
+
+        .branch-input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            margin: 1rem 0;
+        }
+
+        /* Auto-detected tags highlight */
+        .auto-tag-suggestion {
+            background: rgba(255, 215, 0, 0.1);
+            padding: 0.5rem;
+            border-radius: 6px;
+            margin-top: 1rem;
+            border-left: 3px solid var(--accent-secondary);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+    </style>
+</head>
+<body data-theme="light">
+    <!-- Theme Switcher -->
+    <div class="theme-switcher">
+        <button class="theme-btn light active" data-theme="light">☀️</button>
+        <button class="theme-btn dark" data-theme="dark">🌙</button>
+        <button class="theme-btn beige" data-theme="beige">🍂</button>
+    </div>
+
+    <div class="app-container">
+        <!-- File Tree Panel -->
+        <div class="file-panel" id="filePanel">
+            <div class="file-panel-content">
+                <div class="panel-header">
+                    <h3 class="panel-title">Story Universe</h3>
+                    <span>📁</span>
+                </div>
+                
+                <!-- Branch Indicator -->
+                <div class="branch-indicator">
+                    <span>🌿</span>
+                    <span class="branch-name">main</span>
+                    <button class="new-branch-btn" id="newBranchBtn">+ Branch</button>
+                </div>
+                
+                <ul class="file-tree">
+                    <li class="tree-item">
+                        <div class="tree-node active has-image">
+                            <span class="tree-icon">📂</span>
+                            <span>The Lost Library</span>
+                        </div>
+                        <ul class="tree-children">
+                            <li class="tree-item">
+                                <div class="tree-node">
+                                    <span class="tree-icon">📝</span>
+                                    <span>Chapter 1 - Discovery</span>
+                                </div>
+                            </li>
+                            <li class="tree-item">
+                                <div class="tree-node">
+                                    <span class="tree-icon">📝</span>
+                                    <span>Chapter 2 - Revelations</span>
+                                </div>
+                            </li>
+                            <li class="tree-item">
+                                <div class="tree-node">
+                                    <span class="tree-icon">📋</span>
+                                    <span>Character Notes</span>
+                                </div>
+                            </li>
+                            <li class="tree-item">
+                                <div class="tree-node has-image">
+                                    <span class="tree-icon">🎭</span>
+                                    <span>Sarah - Protagonist</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="tree-item">
+                        <div class="tree-node has-image">
+                            <span class="tree-icon">📂</span>
+                            <span>World Building</span>
+                        </div>
+                        <ul class="tree-children">
+                            <li class="tree-item">
+                                <div class="tree-node has-image">
+                                    <span class="tree-icon">🏛️</span>
+                                    <span>Library Layout</span>
+                                </div>
+                            </li>
+                            <li class="tree-item">
+                                <div class="tree-node">
+                                    <span class="tree-icon">🗺️</span>
+                                    <span>Town Map</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+
+                <!-- Image Preview -->
+                <div class="image-preview">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjEyMCIgZmlsbD0iIzY0OTVlZCIgb3BhY2l0eT0iMC4xIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjQ5NWVkIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+TGlicmFyeSBJbnNwaXJhdGlvbjwvdGV4dD48L3N2Zz4=" alt="Library inspiration">
+                    <div class="image-caption">Victorian library atmosphere reference</div>
+                </div>
+
+                <!-- Smart Tag System -->
+                <div class="tag-container">
+                    <div class="tag-section">
+                        <h5>Auto-Detected</h5>
+                        <div class="tag-filter">
+                            <button class="tag auto-detected">protagonist</button>
+                            <button class="tag auto-detected">mystery</button>
+                            <button class="tag auto-detected">discovery</button>
+                        </div>
+                    </div>
+                    
+                    <div class="tag-section">
+                        <h5>Manual Tags</h5>
+                        <div class="tag-filter">
+                            <button class="tag active connected">library</button>
+                            <button class="tag">backstory</button>
+                            <button class="tag connected">journal</button>
+                            <button class="tag">setting</button>
+                            <button class="tag">dialogue</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Auto-tag Suggestion -->
+                <div class="auto-tag-suggestion">
+                    <small><strong>💡 Suggested:</strong> "flashback", "emotional_tension"</small>
+                </div>
+            </div>
+            
+            <!-- Connection Overlay -->
+            <div class="connection-overlay" id="connectionOverlay"></div>
+        </div>
+
+        <!-- Main Writing Area -->
+        <div class="main-area" id="mainArea">
+            <div class="writing-header">
+                <h1 class="app-title">FlowWriter</h1>
+            </div>
+            
+            <div class="writing-container">
+                <div class="writing-area">
+                    <div class="outline-hint" id="outlineHint">
+                        <strong>Current Scene:</strong> Protagonist discovers the hidden journal in the library's secret compartment, realizing it contains details about their own past.
+                        <div class="outline-source">From: Chapter 1 Outline.md</div>
+                    </div>
+                    
+                    <textarea 
+                        class="editor" 
+                        id="editor" 
+                        placeholder="Let your thoughts flow onto the page..."
+                        spellcheck="false"
+                    ></textarea>
+                    
+                    <div class="flow-suggestion" id="flowSuggestion">
+                        💡 Consider exploring how the protagonist's hands tremble as they open the journal...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Format Panel -->
+        <div class="format-panel" id="formatPanel">
+            <div class="format-panel-content">
+                <div class="panel-header">
+                    <h3 class="panel-title">Formatting</h3>
+                    <span>🎨</span>
+                </div>
+
+                <div class="format-section">
+                    <h4>Typography</h4>
+                    <div class="format-controls">
+                        <button class="format-btn">Serif</button>
+                        <button class="format-btn active">Georgia</button>
+                        <button class="format-btn">Times</button>
+                        <button class="format-btn">Garamond</button>
+                    </div>
+                </div>
+
+                <div class="format-section">
+                    <h4>Focus Mode</h4>
+                    <div class="format-controls">
+                        <button class="format-btn" id="focusBtn">🎯 Focus</button>
+                        <button class="format-btn" id="typewriterBtn">⌨️ Typewriter</button>
+                    </div>
+                </div>
+
+                <div class="format-section">
+                    <h4>Export</h4>
+                    <div class="format-controls">
+                        <button class="format-btn">📄 TXT</button>
+                        <button class="format-btn">📑 DOC</button>
+                        <button class="format-btn">📘 PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Toggle Controls -->
+        <div class="panel-toggle left" id="leftToggle">
+            <span>📁</span>
+        </div>
+        <div class="panel-toggle right" id="rightToggle">
+            <span>🎨</span>
+        </div>
+    </div>
+
+    <!-- Branch Modal -->
+    <div class="branch-modal" id="branchModal">
+        <div class="branch-modal-content">
+            <h3>Create New Branch</h3>
+            <p>Explore "what if" scenarios without affecting your main story.</p>
+            <input type="text" class="branch-input" id="branchInput" placeholder="Branch name (e.g., 'alternative_ending')">
+            <div class="format-controls">
+                <button class="format-btn" id="createBranchBtn">Create Branch</button>
+                <button class="format-btn" id="cancelBranchBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-item">
+            <span>📝</span>
+            <span id="wordCount">0 words</span>
+        </div>
+        <div class="status-item">
+            <span id="flowStatus">✍️ In flow</span>
+        </div>
+        <div class="status-item">
+            <span>🌿</span>
+            <span id="branchStatus">main</span>
+        </div>
+        <div class="status-item">
+            <span>💾</span>
+            <span id="lastSaved">Auto-saved just now</span>
+        </div>
+    </div>
+
+    <script>
+        let inactivityTimer;
+        let lastTypingTime = Date.now();
+        let showOutline = false;
+        let filePanelOpen = true;
+        let formatPanelOpen = true;
+        let currentBranch = 'main';
+        let autoDetectedTags = new Set();
+        
+        const editor = document.getElementById('editor');
+        const outlineHint = document.getElementById('outlineHint');
+        const flowSuggestion = document.getElementById('flowSuggestion');
+        const wordCount = document.getElementById('wordCount');
+        const flowStatus = document.getElementById('flowStatus');
+        const lastSaved = document.getElementById('lastSaved');
+        const branchStatus = document.getElementById('branchStatus');
+        
+        // Enhanced flow suggestions
+        const suggestions = [
+            "💡 Consider exploring how the protagonist's hands tremble as they open the journal...",
+            "🌟 What scent fills the air? Old paper, dust, or something more mysterious?",
+            "🔍 This might be the perfect moment to reveal a hidden character trait...",
+            "⚡ Show the character's emotion through their actions rather than words...",
+            "🎭 Perhaps add some internal dialogue to reveal their thoughts?",
+            "🌙 What shadows are playing across the scene? How does light affect the mood?",
+            "🔥 What's the worst thing that could happen right now?",
+            "💫 Consider a flashback or memory triggered by this discovery...",
+            "🗝️ What detail could you add that will be important later?",
+            "🌊 How does this moment change everything for your character?",
+            "🎯 What is your character really afraid of in this moment?",
+            "✨ Add a sensory detail that makes this scene unforgettable..."
+        ];
+
+        // Auto-detection keywords for smart tagging
+        const tagKeywords = {
+            'protagonist': ['main character', 'hero', 'she', 'he', 'they', 'sarah'],
+            'mystery': ['secret', 'hidden', 'unknown', 'mysterious', 'enigma'],
+            'discovery': ['found', 'discovered', 'revealed', 'uncovered', 'noticed'],
+            'emotional_tension': ['trembled', 'heart racing', 'nervous', 'anxious', 'worried'],
+            'flashback': ['remembered', 'recalled', 'past', 'memory', 'years ago'],
+            'setting_atmosphere': ['dust', 'shadows', 'light', 'darkness', 'silence'],
+            'journal': ['journal', 'diary', 'book', 'pages', 'writing'],
+            'library': ['library', 'books', 'shelves', 'volumes', 'archive']
+        };
+
+        function updateWordCount() {
+            const text = editor.value;
+            const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
+            wordCount.textContent = `${words} words`;
+            
+            // Auto-detect tags based on content
+            detectTags(text);
+            
+            if (words > 0) {
+                lastSaved.textContent = 'Auto-saved just now';
+            }
+        }
+
+        function detectTags(text) {
+            const lowerText = text.toLowerCase();
+            const newTags = new Set();
+            
+            Object.entries(tagKeywords).forEach(([tag, keywords]) => {
+                if (keywords.some(keyword => lowerText.includes(keyword))) {
+                    newTags.add(tag);
+                }
+            });
+            
+            // Update auto-detected tags if new ones found
+            newTags.forEach(tag => {
+                if (!autoDetectedTags.has(tag)) {
+                    autoDetectedTags.add(tag);
+                    addAutoDetectedTag(tag);
+                }
+            });
+        }
+
+        function addAutoDetectedTag(tagName) {
+            const autoSection = document.querySelector('.tag-section:first-child .tag-filter');
+            const newTag = document.createElement('button');
+            newTag.className = 'tag auto-detected';
+            newTag.textContent = tagName;
+            newTag.addEventListener('click', () => toggleTag(newTag));
+            autoSection.appendChild(newTag);
+            
+            // Animate in
+            newTag.style.opacity = '0';
+            newTag.style.transform = 'scale(0.8)';
+            setTimeout(() => {
+                newTag.style.transition = 'all 0.3s ease';
+                newTag.style.opacity = '1';
+                newTag.style.transform = 'scale(1)';
+            }, 100);
+        }
+
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimer);
+            lastTypingTime = Date.now();
+            flowStatus.textContent = '✍️ In flow';
+            
+            flowSuggestion.classList.remove('show');
+            
+            inactivityTimer = setTimeout(() => {
+                showFlowSuggestion();
+                flowStatus.textContent = '💭 Pondering...';
+            }, 35000);
+        }
+
+        function showFlowSuggestion() {
+            const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
+            flowSuggestion.textContent = randomSuggestion;
+            
+            // Position suggestion contextually
+            const rect = editor.getBoundingClientRect();
+            const lines = editor.value.substr(0, editor.selectionStart).split('\n');
+            const lineHeight = 30;
+            const top = rect.top + (lines.length - 1) * lineHeight + 60;
+            
+            flowSuggestion.style.top = `${Math.min(top, window.innerHeight - 150)}px`;
+            flowSuggestion.style.left = `${rect.left + 40}px`;
+            flowSuggestion.classList.add('show');
+        }
+
+        function toggleFilePanel() {
+            const panel = document.getElementById('filePanel');
+            const toggle = document.getElementById('leftToggle');
+            
+            filePanelOpen = !filePanelOpen;
+            
+            if (filePanelOpen) {
+                panel.classList.remove('collapsed');
+                toggle.classList.remove('collapsed');
+                toggle.innerHTML = '<span>📁</span>';
+            } else {
+                panel.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                toggle.innerHTML = '<span>📂</span>';
+            }
+        }
+
+        function toggleFormatPanel() {
+            const panel = document.getElementById('formatPanel');
+            const toggle = document.getElementById('rightToggle');
+            
+            formatPanelOpen = !formatPanelOpen;
+            
+            if (formatPanelOpen) {
+                panel.classList.remove('collapsed');
+                toggle.classList.remove('collapsed');
+                toggle.innerHTML = '<span>🎨</span>';
+            } else {
+                panel.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                toggle.innerHTML = '<span>✨</span>';
+            }
+        }
+
+        function toggleTag(tagElement) {
+            tagElement.classList.toggle('active');
+            
+            // Show connections when tag is active
+            if (tagElement.classList.contains('active')) {
+                showTagConnections(tagElement.textContent);
+            } else {
+                hideTagConnections();
+            }
+        }
+
+        function showTagConnections(tagName) {
+            // Remove existing connections
+            hideTagConnections();
+            
+            // Find all files with this tag (simulated)
+            const connectedFiles = document.querySelectorAll('.tree-node');
+            connectedFiles.forEach((file, index) => {
+                if (Math.random() > 0.6) { // Simulate some files having the tag
+                    file.style.backgroundColor = 'rgba(255, 215, 0, 0.1)';
+                    file.style.borderLeft = '3px solid #ffd700';
+                }
+            });
+        }
+
+        function hideTagConnections() {
+            const files = document.querySelectorAll('.tree-node');
+            files.forEach(file => {
+                file.style.backgroundColor = '';
+                file.style.borderLeft = '';
+            });
+        }
+
+        function createNewBranch() {
+            const modal = document.getElementById('branchModal');
+            modal.classList.add('show');
+        }
+
+        function hideBranchModal() {
+            const modal = document.getElementById('branchModal');
+            const input = document.getElementById('branchInput');
+            modal.classList.remove('show');
+            input.value = '';
+        }
+
+        function switchBranch(branchName) {
+            currentBranch = branchName;
+            branchStatus.textContent = branchName;
+            
+            // Update branch indicator
+            document.querySelector('.branch-name').textContent = branchName;
+            
+            // Show branch switch notification
+            showNotification(`Switched to branch: ${branchName}`);
+        }
+
+        function showNotification(message) {
+            // Create temporary notification
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 5rem;
+                right: 1rem;
+                background: var(--accent-primary);
+                color: white;
+                padding: 1rem;
+                border-radius: 8px;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        function switchTheme(theme) {
+            document.body.setAttribute('data-theme', theme);
+            
+            // Update active theme button
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-theme="${theme}"]`).classList.add('active');
+            
+            // Save theme preference
+            localStorage.setItem('flowwriter-theme', theme);
+        }
+
+        // Event Listeners
+        editor.addEventListener('input', () => {
+            updateWordCount();
+            resetInactivityTimer();
+        });
+
+        editor.addEventListener('keydown', resetInactivityTimer);
+
+        flowSuggestion.addEventListener('click', () => {
+            flowSuggestion.classList.remove('show');
+            resetInactivityTimer();
+        });
+
+        // Panel toggles
+        document.getElementById('leftToggle').addEventListener('click', toggleFilePanel);
+        document.getElementById('rightToggle').addEventListener('click', toggleFormatPanel);
+
+        // Branch management
+        document.getElementById('newBranchBtn').addEventListener('click', createNewBranch);
+        document.getElementById('cancelBranchBtn').addEventListener('click', hideBranchModal);
+        document.getElementById('createBranchBtn').addEventListener('click', () => {
+            const branchName = document.getElementById('branchInput').value.trim();
+            if (branchName) {
+                switchBranch(branchName);
+                hideBranchModal();
+            }
+        });
+
+        // Theme switching
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                switchTheme(btn.getAttribute('data-theme'));
+            });
+        });
+
+        // Tree node clicks
+        document.querySelectorAll('.tree-node').forEach(node => {
+            node.addEventListener('click', () => {
+                document.querySelectorAll('.tree-node').forEach(n => n.classList.remove('active'));
+                node.classList.add('active');
+                
+                // Simulate loading different file content
+                if (node.textContent.includes('Chapter 1')) {
+                    outlineHint.innerHTML = `
+                        <strong>Current Scene:</strong> Opening scene - protagonist arrives at the library for research, notices something unusual.
+                        <div class="outline-source">From: Chapter 1 Outline.md</div>
+                    `;
+                } else if (node.textContent.includes('Character Notes')) {
+                    outlineHint.innerHTML = `
+                        <strong>Character Focus:</strong> Sarah Chen, 28, historian with photographic memory. Estranged from family.
+                        <div class="outline-source">From: Character Notes.md</div>
+                    `;
+                }
+                outlineHint.classList.add('show');
+            });
+        });
+
+        // Tag filtering
+        document.querySelectorAll('.tag').forEach(tag => {
+            tag.addEventListener('click', () => toggleTag(tag));
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'b':
+                        e.preventDefault();
+                        createNewBranch();
+                        break;
+                    case '\\':
+                        e.preventDefault();
+                        toggleFilePanel();
+                        break;
+                    case '/':
+                        e.preventDefault();
+                        toggleFormatPanel();
+                        break;
+                }
+            }
+            if (e.key === 'Escape') {
+                hideBranchModal();
+                flowSuggestion.classList.remove('show');
+            }
+        });
+
+        // Initialize
+        resetInactivityTimer();
+        updateWordCount();
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('flowwriter-theme') || 'light';
+        switchTheme(savedTheme);
+        
+        // Sample content for demo
+        setTimeout(() => {
+            editor.value = "The old library stood silent, its dust-covered shelves holding secrets that had been forgotten for decades. Sarah stepped carefully across the creaking floorboards, her flashlight cutting through the darkness like a blade through velvet.\n\nSomething glinted in the far corner—a leather-bound journal that seemed impossibly out of place among the deteriorating books. As she reached for it, her heart began to race with anticipation and dread. This wasn't just any journal... the cover bore her grandmother's initials.\n\nHer hands trembled as she opened it to the first page, where elegant script revealed words that would change everything she thought she knew about her family's past.\n\n";
+            updateWordCount();
+            
+            // Show outline hint after a moment
+            setTimeout(() => {
+                outlineHint.classList.add('show');
+            }, 2000);
+        }, 1000);
+
+        // Auto-hide panels on small screens
+        function handleResize() {
+            if (window.innerWidth < 768) {
+                if (filePanelOpen) toggleFilePanel();
+                if (formatPanelOpen) toggleFormatPanel();
+            }
+        }
+
+        window.addEventListener('resize', handleResize);
+        handleResize(); // Check on load
+    </script>
+</body>
+</html>
